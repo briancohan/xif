@@ -1,11 +1,12 @@
 import json
+import time
 from pathlib import Path
 from typing import Any
 
 from bs4 import BeautifulSoup
 from PIL import Image
 
-EXIF_FIELD = 0x9286  # User Comment
+from xif.config import Config
 
 
 class ImageDir:
@@ -47,26 +48,52 @@ class ImageDir:
         return self.data[image.name]
 
 
-def add_exif(
+def add_exif_to_image(
     image: Path,
     exif_data: dict,
     output_dir: Path = None,
-    print_: bool = False,
 ) -> None:
     if not image.exists():
         return
     if output_dir is None:
         output_dir = image.parent
-    if print_:
+    if Config.VERBOSE:
         print(image)
 
     im = Image.open(image)
     exif = im.getexif()
-    exif[EXIF_FIELD] = json.dumps(exif_data)
+    exif[Config.EXIF_FIELD] = json.dumps(exif_data)
     im.save(output_dir / image.name, exif=exif)
 
 
-def get_exif(image: Path) -> dict:
+def get_exif_from_image(image: Path) -> dict:
+    if Config.VERBOSE:
+        print(image)
     im = Image.open(image)
     exif = im.getexif()
-    return json.loads(exif[EXIF_FIELD])
+    return json.loads(exif[Config.EXIF_FIELD])
+
+
+def add_exif(directory: Path) -> tuple[int, float]:
+    id = ImageDir(directory)
+    start = time.perf_counter()
+
+    for img in id.images:
+        add_exif_to_image(img, id.image_exif(img))
+
+    return len(id.images), time.perf_counter() - start
+
+
+def get_exif(directory: Path, recursive: bool = False) -> tuple[set, set]:
+    y = set()
+    n = set()
+
+    func = directory.rglob if recursive else directory.glob
+    for img in func("*.png"):
+        try:
+            get_exif_from_image(img)
+            y.add(img)
+        except KeyError:
+            n.add(img)
+
+    return y, n

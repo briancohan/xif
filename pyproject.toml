@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "xif"
-version = "0.1.0"
+version = "0.1.1"
 description = "CLI Utility for Adding and Removing Metadata for AI Art"
 license = "MIT"
 authors = ["Brian Cohan <briancohan@gmail.com>"]

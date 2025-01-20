@@ -3,9 +3,16 @@ from pathlib import Path
 import typer
 from typing_extensions import Annotated
 
-from xif.main import ImageDir, add_exif, get_exif
+from xif.config import Config
+from xif.main import add_exif, get_exif, get_exif_from_image
 
 app = typer.Typer()
+
+
+def print_table(data: dict[str, str]) -> None:
+    key_len = max(len(key) for key in data.keys())
+    for key, value in data.items():
+        print(f"{key + ':':.<{key_len}} {value}")
 
 
 @app.command(help="Add EXIF data to an image")
@@ -13,17 +20,14 @@ def add(
     directory: Path = typer.Argument(Path.cwd(), exists=True),
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
 ) -> None:
-    id = ImageDir(directory)
-    for img in id.images:
-        add_exif(img, id.image_exif(img), print_=verbose)
+    Config.verbose = verbose
+    n, time = add_exif(directory)
+    print(f"Added EXIF data to {n} images in {time:.2f}s")
 
 
 @app.command(help="Get EXIF data from an image")
 def get(image: Path = typer.Argument(..., exists=True)) -> None:
-    data = get_exif(image)
-    key_len = max(len(key) for key in data.keys())
-    for key, value in data.items():
-        print(f"{key + ':':.<{key_len}} {value}")
+    print_table(get_exif_from_image(image))
 
 
 @app.command(help="Check if all images in a directory have EXIF data")
@@ -31,17 +35,10 @@ def check(
     directory: Path = typer.Argument(Path.cwd(), exists=True),
     recursive: Annotated[bool, typer.Option("--recursive", "-R")] = False,
     list: Annotated[bool, typer.Option("--list", "-l")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
 ) -> None:
-    y = set()
-    n = set()
-
-    func = directory.rglob if recursive else directory.glob
-    for img in func("*.png"):
-        try:
-            get_exif(img)
-            y.add(img)
-        except KeyError:
-            n.add(img)
+    Config.verbose = verbose
+    y, n = get_exif(directory, recursive)
 
     print(f"{len(y):>4} - \u2705 EXIF")
     print(f"{len(n):>4} - \u274C EXIF")
